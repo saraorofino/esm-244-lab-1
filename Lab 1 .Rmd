@@ -93,3 +93,76 @@ wine_points <- ggplot(wine_new, aes(x = price, y = points)) +
 wine_points
 ```
 
+####2. California counties (spatial data) using sf
+
+File types for spatial data:
+- Feature geometry: .shp
+- Index of feature geometry: .shx
+- Character encoding: .cpg
+- Attribute information: .dbf (Attributes - non-spatial information associated with spatial information)
+- Coodinate system information: .prj
+- International Organization for Standardization (ISO 191) metadata: .shp.iso.xml
+- ISO 191 (entity and attribute) metatdata: .shp.ea.iso.xml
+
+
+**Attribute variables we'll use**:
+
+a. Use st_read() in the *sf* package to read in shape file data. You'll need to include the directory (dsn - just "." if in the project working directory) and the file prefix argument 'layer = "prefix_here"'.
+
+```{r}
+ca_counties <- st_read(dsn = ".", layer = "CA_Counties_TIGER2016") #dsn is directory, layer is the beginning title string before the .cpg or .sbn
+
+plot(ca_counties) #plots every different column in the dataset
+```
+
+A **really** cool thing about the *sf* package is that geometries are sticky - that means that we basically get to work with spatial attributes like a normal tibble/data frame, but the geometries (spatial information) stick to it. 
+
+b. Select only the ALAND attribute + County name. Notice that geometries stick. Use plot() to see counties. 
+```{r}
+#simplifed version with just the name and the land category
+
+ca_land <- ca_counties %>% 
+  select(NAME, ALAND)
+
+# now I want to get income data and bind it to the land and name data.
+
+# First, read in data for population and income. I need to be sure that the location (COUNTY in this df) matches the name of the location column (NAME) in the other df. Use the rename function to change COUNTY to NAME.
+
+ca_pop_inc <- read_csv("ca_pop_inc.csv") %>% 
+  rename(NAME = COUNTY)
+
+# Now join this dataframe to the simple ca_land dataframe. Note that the column names must match exactly as well as the naming convention for the locations (ex: Sierra vs. Sierra_county - will NOT join)
+
+# use full_join to join ALL the data (this is the safest bet) 
+
+ca_df <- full_join(ca_land, ca_pop_inc) %>% 
+ select(NAME, MedFamilyIncome)
+```
+
+c. Use geom_sf() to make a map in ggplot 
+```{r}
+# Regular sf map:
+
+ca_income <- ggplot(ca_df) +
+  geom_sf(aes(fill = MedFamilyIncome))
+
+ca_income
+
+# Leaflet map (Interactive): 
+# For this to work we need to first change coordinate reference system to the same kind that leaflet uses
+
+ca_df_transform <- st_transform(ca_df, crs = 4326)
+
+# Now make a map with the transform data
+
+leaflet(ca_df_transform) %>% 
+  addTiles() %>% 
+  addPolygons (weight = 1.0,
+              opacity = 1.0,
+              color = "white",
+              fillOpacity = 0.5,
+              fillColor = ~colorQuantile("YlOrRd", MedFamilyIncome)(MedFamilyIncome)
+              )
+```
+
+####3. Shiny Apps
