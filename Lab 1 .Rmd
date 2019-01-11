@@ -1,0 +1,95 @@
+---
+title: "ESM 244 Lab 1"
+author: "Sara Orofino"
+date: "1/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Objectives**:
+
+- basic review of data wrangling
+- intro to spatial data in R with sf
+- intro to shiny apps 
+
+**Packages**: 
+
+```{r}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(tmap)
+```
+
+####1. Review: reading, exploring, wrangling, and visualizing data 
+
+a. Read in the data   
+```{r, data}
+
+wine <- read_csv("wine_data.csv")
+
+```
+
+b. Data wrangling:
+   Select - country, province, winery, region_1, points, price
+   Rename - province to state
+   Filter fo only California, Oregon, and Washington
+   Add a column for price/points
+   Arrange price/point from highest to lowest
+```{r, wrangling}
+
+wine_new <- wine %>% 
+  select(country, province, winery, region_1, points, price) %>% 
+  rename(state = province) %>% 
+  filter(state == "California" | state == "Oregon" | state == "Washington") %>% 
+  mutate(ppd = points/price) %>% 
+  arrange(-ppd)
+```
+
+c. Summarize data:
+   Summarize groups based on state using group_by()
+   Find mean, maximum, minimum, and count
+   
+```{r, summary}
+
+wine_summary <- wine_new %>% 
+  group_by(state) %>% 
+  summarize(
+    mean_ppd = mean(ppd, na.rm = TRUE),
+    max_ppd = max(ppd, na.rm = TRUE),
+    min_ppd = min(ppd, na.rm = TRUE),
+    count = length(state)
+  )
+```
+
+d. A few gg-graphics 
+   1. Histograms of price per dollar value by state (side-by-side histograms)
+   
+```{r, wine histogram}
+# number of bins 
+k <- 2*((NROW(na.omit(wine_new$ppd)))^(1/3))
+        
+wine_hist <- ggplot(wine_new, aes(x = ppd)) + 
+  geom_histogram(bins = k, aes(fill=state)) +
+  facet_wrap(~state, scales = "free") 
+
+wine_hist
+```
+
+  2. Scatterplot graph of price vs. points, with color determined by state, adding a linear model trendline on top of it
+
+```{r, scatterplot}
+
+wine_points <- ggplot(wine_new, aes(x = price, y = points)) +
+  geom_point(aes(color = state), alpha = 0.5) +
+  geom_smooth(color = "black", method = "lm", se = FALSE) +
+  scale_color_manual(breaks = c("California", "Oregon", "Washington"), values = c("blue", "coral", "purple")) +
+  facet_wrap(~state) +
+  theme_light()
+
+wine_points
+```
+
